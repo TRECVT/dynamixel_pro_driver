@@ -75,7 +75,7 @@ DynamixelProDriver::DynamixelProDriver(std::string device="/dev/ttyUSB0",
     last_reset_sec = 0.0;
 
     pthread_mutex_init(&serial_mutex_, NULL);
-    port_ = new serial::Serial(device, atoi(baud.c_str()), serial::Timeout::simpleTimeout(1));
+    port_ = new serial::Serial(device, atoi(baud.c_str()), serial::Timeout::simpleTimeout(1000));
 
     
 }
