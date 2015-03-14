@@ -335,7 +335,7 @@ bool DynamixelProDriver::getPosition(int servo_id, int32_t& position)
 
     if (read(servo_id, DXL_PRESENT_POSITION, 4, response))
     {
-        position = *((int32_t *)(&response[REPLY_BEGIN_INDEX])); 
+        position = *((int32_t *)(&response[REPLY_BEGIN_INDEX]));
         return DMX_PRO_DRIVER_ERROR_CHECK(servo_id, response[ERROR_INDEX]);
     }
 
@@ -555,11 +555,7 @@ bool DynamixelProDriver::setTorqueEnabled(int servo_id, bool on)
 
 bool DynamixelProDriver::setPosition(int servo_id, uint32_t position)
 {
-    std::vector<uint8_t> data;
-
-    //expand the vector to be the right size
-    for (int i = 0; i < 4; i++)
-        data.push_back(0);
+    std::vector<uint8_t> data(4, 0);
     *((uint32_t *)&data[0])=position;
 
     std::vector<uint8_t> response;
@@ -598,7 +594,7 @@ bool DynamixelProDriver::setMultiPosition(std::vector<std::vector<int> > value_p
         int32_t position = value_pairs[i][1];
 
         std::vector<uint8_t> value_pair;
-        value_pair.push_back(motor_id);                 // servo id
+        value_pair.push_back(motor_id); // servo id
         
         //expand the vector to be the right size
         for (int i = 0; i < 4; i++)
@@ -609,10 +605,7 @@ bool DynamixelProDriver::setMultiPosition(std::vector<std::vector<int> > value_p
         data.push_back(value_pair);
     }
 
-    if (syncWrite(DXL_GOAL_POSITION, data)) 
-        return true;
-    else 
-        return false; 
+    return syncWrite(DXL_GOAL_POSITION, data);
 }
 
 bool DynamixelProDriver::setMultiVelocity(std::vector<std::vector<int> > value_pairs)
@@ -636,10 +629,7 @@ bool DynamixelProDriver::setMultiVelocity(std::vector<std::vector<int> > value_p
         data.push_back(value_pair);
     }
 
-    if (syncWrite(DXL_GOAL_SPEED, data)) 
-        return true;
-    else 
-        return false;
+    return syncWrite(DXL_GOAL_SPEED, data);
 }
 
 bool DynamixelProDriver::setMultiPositionVelocity(std::vector<std::vector<int> > value_tuples)
@@ -790,7 +780,7 @@ bool DynamixelProDriver::write(int servo_id,
     packet[1] = 0xFF;
     packet[2] = 0xFD;
     packet[3] = 0x00;
-    packet[4] = servo_id;
+    packet[4] = servo_id & 0xFF; //only grab LSB
     packet[5] = LOBYTE(length);
     packet[6] = HIBYTE(length);//header 
 
@@ -798,10 +788,7 @@ bool DynamixelProDriver::write(int servo_id,
     packet[8] = LOBYTE(address);
     packet[9] = HIBYTE(address);
 
-    for (unsigned int i = 0; i < data.size(); ++i)
-    {
-        packet[10+i] = data[i];
-    }
+    memcpy(&packet[10], &data[0], data.size());
 
     pthread_mutex_lock(&serial_mutex_);
     bool success = writePacket(packet);
