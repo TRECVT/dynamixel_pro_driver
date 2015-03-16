@@ -32,17 +32,11 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  *********************************************************************/
 #include <time.h>
-#include <pthread.h>
-#include <stdint.h>
 #include <stdio.h>
 #include <iostream>
 #include <stdlib.h>
 
 #include <sstream>
-#include <map>
-#include <set>
-#include <string>
-#include <vector>
 
 #include <ros/ros.h>
 
@@ -63,13 +57,14 @@ using namespace std;
 namespace dynamixel_pro_driver
 {
 
-DynamixelProDriver::DynamixelProDriver(std::string device="/dev/ttyUSB0",
-                         std::string baud="1000000")
+DynamixelProDriver::DynamixelProDriver(const std::string& device="/dev/ttyUSB0",
+                         const std::string& baud="1000000") :
+    read_error_count(0),
+    read_count(0),
+    last_reset_sec(0.0),
+    port_(NULL),
+    serial_mutex_()
 {
-    read_count = 0;
-    read_error_count = 0;
-    last_reset_sec = 0.0;
-
     pthread_mutex_init(&serial_mutex_, NULL);
     port_ = new serial::Serial(device, atoi(baud.c_str()), serial::Timeout::simpleTimeout(1000));
 }
@@ -561,7 +556,7 @@ bool DynamixelProDriver::setVelocity(int servo_id, int32_t velocity)
     return false;
 }
 
-bool DynamixelProDriver::setMultiPosition(std::vector<std::vector<int> > value_pairs)
+bool DynamixelProDriver::setMultiPosition(const std::vector<std::vector<int> > &value_pairs)
 {
     std::vector<std::vector<uint8_t> > data;
 
@@ -585,7 +580,7 @@ bool DynamixelProDriver::setMultiPosition(std::vector<std::vector<int> > value_p
     return syncWrite(DXL_GOAL_POSITION, data);
 }
 
-bool DynamixelProDriver::setMultiVelocity(std::vector<std::vector<int> > value_pairs)
+bool DynamixelProDriver::setMultiVelocity(const std::vector<std::vector<int> > &value_pairs)
 {
     std::vector<std::vector<uint8_t> > data;
 
@@ -609,7 +604,7 @@ bool DynamixelProDriver::setMultiVelocity(std::vector<std::vector<int> > value_p
     return syncWrite(DXL_GOAL_SPEED, data);
 }
 
-bool DynamixelProDriver::setMultiPositionVelocity(std::vector<std::vector<int> > value_tuples)
+bool DynamixelProDriver::setMultiPositionVelocity(const std::vector<std::vector<int> > &value_tuples)
 {
     std::vector<std::vector<uint8_t> > data;
 
@@ -633,7 +628,7 @@ bool DynamixelProDriver::setMultiPositionVelocity(std::vector<std::vector<int> >
     return syncWrite(DXL_GOAL_POSITION, data);
 }
 
-bool DynamixelProDriver::setMultiTorqueEnabled(std::vector<std::vector<int> > value_pairs)
+bool DynamixelProDriver::setMultiTorqueEnabled(const std::vector<std::vector<int> > &value_pairs)
 {
     std::vector<std::vector<uint8_t> > data;
 
@@ -652,7 +647,7 @@ bool DynamixelProDriver::setMultiTorqueEnabled(std::vector<std::vector<int> > va
     return syncWrite(DXL_TORQUE_ENABLE, data);
 }
 
-bool DynamixelProDriver::validateNoErrorsProtected(int servo_id, uint8_t error_code, std::string method_name)
+bool DynamixelProDriver::validateNoErrorsProtected(int servo_id, uint8_t error_code, const std::string& method_name)
 {
   if (validateNoErrors(servo_id, error_code, method_name))
   {
@@ -671,7 +666,7 @@ bool DynamixelProDriver::validateNoErrorsProtected(int servo_id, uint8_t error_c
   }
 }
 
-bool DynamixelProDriver::validateNoErrors(int servo_id, uint8_t error_code, std::string command_failed)
+bool DynamixelProDriver::validateNoErrors(int servo_id, uint8_t error_code, const std::string& command_failed)
 {
     if (error_code == DXL_NO_ERROR)
     {
@@ -928,7 +923,7 @@ bool DynamixelProDriver::readResponse(std::vector<uint8_t>& response)
     return false;
 }
 
-uint16_t DynamixelProDriver::calculate_crc(uint8_t *data)
+uint16_t DynamixelProDriver::calculate_crc(uint8_t *data) const
 {
     uint16_t size = MAKEWORD(data[PKT_LENGTH_L], data[PKT_LENGTH_H]) + 5;
     //cout << "size is" << size << endl;
@@ -983,7 +978,7 @@ uint16_t DynamixelProDriver::calculate_crc(uint8_t *data)
     return crc_accum;
 }
 
-vector<uint8_t> DynamixelProDriver::stuff_packet(uint8_t *packet)
+vector<uint8_t> DynamixelProDriver::stuff_packet(uint8_t *packet) const
 {
    vector<uint8_t> stuffed_packet;
 
